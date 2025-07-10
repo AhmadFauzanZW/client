@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QR Code Generator untuk Pekerja</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .worker-card { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .qr-code { margin: 10px 0; }
+        .generate-btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .download-btn { background: #28a745; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
+</head>
+<body>
+    <h1>QR Code Generator untuk Sistem Absensi</h1>
+    
+    <div>
+        <h3>Generate QR Code untuk Pekerja</h3>
+        <input type="text" id="workerId" placeholder="ID Pekerja" style="padding: 8px; margin: 5px;">
+        <input type="text" id="workerName" placeholder="Nama Pekerja" style="padding: 8px; margin: 5px;">
+        <button onclick="generateQRCode()" class="generate-btn">Generate QR Code</button>
+    </div>
+
+    <div id="qrResult" style="margin: 20px 0;"></div>
+
+    <div>
+        <h3>Contoh QR Code untuk Testing</h3>
+        <div class="worker-card">
+            <h4>Pekerja 1 - John Doe</h4>
+            <div class="qr-code" id="sample1"></div>
+            <p><strong>QR Value:</strong> <span id="sample1Value"></span></p>
+            <button onclick="downloadQR('sample1', 'john_doe_qr')" class="download-btn">Download QR</button>
+        </div>
+        
+        <div class="worker-card">
+            <h4>Pekerja 2 - Jane Smith</h4>
+            <div class="qr-code" id="sample2"></div>
+            <p><strong>QR Value:</strong> <span id="sample2Value"></span></p>
+            <button onclick="downloadQR('sample2', 'jane_smith_qr')" class="download-btn">Download QR</button>
+        </div>
+    </div>
+
+    <script>
+        // Function to generate QR code value with security
+        function generateQRValue(workerId, workerName) {
+            const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+            const randomString = Math.random().toString(36).substring(2, 8); // Random 6 chars
+            return `EMP_${String(workerId).padStart(3, '0')}_${randomString}${timestamp}`;
+        }
+
+        // Generate QR Code
+        function generateQRCode() {
+            const workerId = document.getElementById('workerId').value;
+            const workerName = document.getElementById('workerName').value;
+            
+            if (!workerId || !workerName) {
+                alert('Mohon isi ID dan Nama Pekerja');
+                return;
+            }
+
+            const qrValue = generateQRValue(workerId, workerName);
+            const resultDiv = document.getElementById('qrResult');
+            
+            resultDiv.innerHTML = `
+                <div class="worker-card">
+                    <h4>${workerName} (ID: ${workerId})</h4>
+                    <div class="qr-code" id="generated"></div>
+                    <p><strong>QR Value:</strong> <span id="generatedValue">${qrValue}</span></p>
+                    <button onclick="downloadQR('generated', '${workerName.replace(/\s+/g, '_').toLowerCase()}_qr')" class="download-btn">Download QR</button>
+                    <p><em>Salin nilai QR di atas ke database untuk pekerja ini</em></p>
+                </div>
+            `;
+
+            QRCode.toCanvas(document.getElementById('generated'), qrValue, {
+                width: 200,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            });
+        }
+
+        // Download QR Code as image
+        function downloadQR(canvasId, filename) {
+            const canvas = document.querySelector(`#${canvasId} canvas`);
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = `${filename}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+            }
+        }
+
+        // Generate sample QR codes on page load
+        window.onload = function() {
+            // Sample 1
+            const sample1Value = generateQRValue(1, 'John Doe');
+            document.getElementById('sample1Value').textContent = sample1Value;
+            QRCode.toCanvas(document.getElementById('sample1'), sample1Value, {
+                width: 200,
+                margin: 2
+            });
+
+            // Sample 2
+            const sample2Value = generateQRValue(2, 'Jane Smith');
+            document.getElementById('sample2Value').textContent = sample2Value;
+            QRCode.toCanvas(document.getElementById('sample2'), sample2Value, {
+                width: 200,
+                margin: 2
+            });
+        };
+    </script>
+</body>
+</html>

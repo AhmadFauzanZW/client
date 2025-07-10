@@ -7,6 +7,89 @@ import * as faceapi from 'face-api.js';
 import Webcam from 'react-webcam';
 import { QrReader } from 'react-qr-reader';
 
+// Custom QR Scanner Component with visible camera
+const CustomQrReader = ({ onResult, style }) => {
+    const [isScanning, setIsScanning] = useState(true);
+    const [error, setError] = useState(null);
+    const [lastScan, setLastScan] = useState('');
+    
+    const handleResult = (result, error) => {
+        if (result) {
+            const scannedText = result.text;
+            console.log('QR Scanned:', scannedText);
+            
+            // Prevent duplicate scans within 2 seconds
+            if (scannedText !== lastScan) {
+                setLastScan(scannedText);
+                onResult(result);
+                
+                // Reset after 2 seconds to allow re-scanning
+                setTimeout(() => setLastScan(''), 2000);
+            }
+        }
+        
+        // Perbaikan error handling yang lebih robust
+        if (error) {
+            try {
+                // Pastikan error memiliki struktur yang benar
+                const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                
+                // Hanya log error yang bukan "No QR code found"
+                if (typeof errorMessage === 'string' && !errorMessage.toLowerCase().includes('no qr code found')) {
+                    console.warn('QR Scan Error:', errorMessage);
+                    setError(errorMessage);
+                    
+                    // Clear error setelah 3 detik
+                    setTimeout(() => setError(null), 3000);
+                }
+            } catch (e) {
+                console.warn('Error processing QR scan error:', e);
+            }
+        }
+    };
+    
+    return (
+        <div style={style} className="relative">
+            {isScanning && (
+                <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs z-10">
+                    Scanning...
+                </div>
+            )}
+            {error && (
+                <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs z-10">
+                    Error: {error}
+                </div>
+            )}
+            <QrReader
+                onResult={handleResult}
+                constraints={{ 
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }}
+                style={{ width: '100%', height: '100%' }}
+                videoStyle={{ 
+                    objectFit: 'cover',
+                    width: '100%',
+                    height: '100%'
+                }}
+                containerStyle={{ 
+                    width: '100%', 
+                    height: '100%',
+                    position: 'relative'
+                }}
+                scanDelay={500}
+                videoId="qr-video"
+            />
+            {/* Scanning overlay */}
+            <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute inset-0 border-2 border-blue-400 rounded-lg animate-pulse"></div>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-red-400 rounded-lg"></div>
+            </div>
+        </div>
+    );
+};
+
 // Helper untuk styling badge status (diambil dari kode Anda)
 const getStatusBadge = (status) => {
     if (!status) return 'bg-gray-100 text-gray-500';
@@ -36,17 +119,25 @@ const AttendanceModal = ({ isOpen, onClose, onComplete, mode, worker, actionType
     const [capturedImage, setCapturedImage] = useState(null);
     const [allWorkers, setAllWorkers] = useState([]);
     const [selectedWorkerId, setSelectedWorkerId] = useState('');
+    const [selectedWorkerStatus, setSelectedWorkerStatus] = useState(null);
+    const [detectedAction, setDetectedAction] = useState('clock_in');
     const videoRef = useRef();
     const webcamRef = useRef();
     const intervalRef = useRef();
 
     useEffect(() => {
         if (mode === 'face' && isOpen) {
-            axiosInstance.get('/pekerja/all')
+            // Fetch all workers with their current status
+            axiosInstance.get('/kehadiran/status-harian')
                 .then(response => {
                     setAllWorkers(response.data);
                     if (response.data.length > 0) {
                         setSelectedWorkerId(response.data[0].id_pekerja);
+                        setSelectedWorkerStatus(response.data[0]);
+                        // Determine action based on worker status
+                        const hasClockIn = !!response.data[0].waktu_clock_in;
+                        const hasClockOut = !!response.data[0].waktu_clock_out;
+                        setDetectedAction(hasClockIn && !hasClockOut ? 'clock_out' : 'clock_in');
                     }
                 })
                 .catch(err => setError('Gagal memuat daftar pekerja.'));
@@ -58,6 +149,8 @@ const AttendanceModal = ({ isOpen, onClose, onComplete, mode, worker, actionType
             setIsProcessing(false);
             setError('');
             setCapturedImage(null);
+            setSelectedWorkerStatus(null);
+            setDetectedAction('clock_in');
             if (intervalRef.current) clearInterval(intervalRef.current);
             if (videoRef.current?.srcObject) {
                 videoRef.current.srcObject.getTracks().forEach(t => t.stop());
@@ -69,15 +162,32 @@ const AttendanceModal = ({ isOpen, onClose, onComplete, mode, worker, actionType
         setIsProcessing(true);
         setError('');
         try {
-            const endpoint = payloadData.metode === 'QR' ? '/kehadiran/catat-by-qr' : '/kehadiran/catat';
-            const { data } = await axiosInstance.post(endpoint, payloadData);
+            let endpoint = '/kehadiran/catat';
+            let payload = payloadData;
+            
+            // Use different endpoints based on method
+            if (payloadData.metode === 'QR') {
+                endpoint = '/kehadiran/catat-by-qr';
+                // Format payload sesuai dengan yang diharapkan backend
+                payload = {
+                    qrCode: payloadData.qrCode,
+                    tipeAksi: payloadData.tipeAksi || 'auto',
+                    idLokasi: payloadData.idLokasi || 1
+                };
+            }
+            
+            console.log('Submitting to endpoint:', endpoint);
+            console.log('Payload:', payload);
+            
+            const { data } = await axiosInstance.post(endpoint, payload);
             alert(data.message || 'Aksi berhasil dicatat!');
             onComplete();
             onClose();
         } catch (err) {
             const errorMessage = err.response?.data?.message || 'Terjadi kesalahan saat mencatat absensi.';
+            console.error('Submit error:', err);
             setError(errorMessage);
-            alert(errorMessage); // Tampilkan alert error juga
+            alert(errorMessage);
         } finally {
             setIsProcessing(false);
         }
@@ -113,7 +223,7 @@ const AttendanceModal = ({ isOpen, onClose, onComplete, mode, worker, actionType
         if (!selectedWorkerId || !capturedImage) return;
         handleSubmit({
             id_pekerja: selectedWorkerId,
-            tipe_aksi: 'clock_in',
+            tipe_aksi: detectedAction,
             metode: 'Wajah',
             fotoB64: capturedImage,
             id_lokasi: 1,
@@ -137,16 +247,50 @@ const AttendanceModal = ({ isOpen, onClose, onComplete, mode, worker, actionType
 
     const handleQrScan = (result) => {
         if (result && !isProcessing) {
+            const scannedCode = result.text;
+            console.log('QR Code Scanned:', scannedCode);
+            
+            // Validate QR Code format (should start with EMP_)
+            if (!scannedCode.startsWith('EMP_')) {
+                setError('QR Code tidak valid. Format harus dimulai dengan EMP_');
+                alert('QR Code tidak valid untuk sistem absensi ini.');
+                return;
+            }
+            
+            // Extract worker ID from QR code (EMP_001_randomstring -> 001)
+            const qrParts = scannedCode.split('_');
+            if (qrParts.length < 3) {
+                setError('Format QR Code tidak valid');
+                alert('Format QR Code tidak sesuai dengan sistem.');
+                return;
+            }
+            
+            console.log('QR Code valid, submitting to backend...');
+            
+            // Submit dengan format yang sesuai dengan backend
             handleSubmit({
-                qrCode: result.text,
-                tipeAksi: actionType,
+                qrCode: scannedCode,
+                tipeAksi: 'auto', // Backend akan menentukan
                 metode: 'QR',
-                idLokasi: 1, // Asumsi lokasi
+                idLokasi: 1,
             });
         }
     };
     
     if (!isOpen) return null;
+
+    // Function to handle worker selection and update action type
+    const handleWorkerSelection = (workerId) => {
+        setSelectedWorkerId(workerId);
+        const worker = allWorkers.find(w => w.id_pekerja === workerId);
+        setSelectedWorkerStatus(worker);
+        
+        if (worker) {
+            const hasClockIn = !!worker.waktu_clock_in;
+            const hasClockOut = !!worker.waktu_clock_out;
+            setDetectedAction(hasClockIn && !hasClockOut ? 'clock_out' : 'clock_in');
+        }
+    };
 
     // ... (Konten render modal tetap sama seperti sebelumnya, tidak perlu diubah)
     const renderContent = () => {
@@ -167,13 +311,20 @@ const AttendanceModal = ({ isOpen, onClose, onComplete, mode, worker, actionType
                                 <img src={capturedImage} alt="Bukti Absen" className="w-full rounded-lg mb-4 border" style={{ transform: 'scaleX(-1)' }}/>
                                 <div className="space-y-2">
                                     <label htmlFor="pekerja-select" className="block text-sm font-medium text-gray-700">Pilih Pekerja:</label>
-                                    <select id="pekerja-select" value={selectedWorkerId} onChange={(e) => setSelectedWorkerId(e.target.value)} className="block w-full p-2 border-gray-300 rounded-md shadow-sm">
+                                    <select id="pekerja-select" value={selectedWorkerId} onChange={(e) => handleWorkerSelection(e.target.value)} className="block w-full p-2 border-gray-300 rounded-md shadow-sm">
                                         {allWorkers.map(p => <option key={p.id_pekerja} value={p.id_pekerja}>{p.nama_pengguna}</option>)}
                                     </select>
+                                    {selectedWorkerStatus && (
+                                        <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                                            <p><strong>Status saat ini:</strong></p>
+                                            <p>Clock-In: {selectedWorkerStatus.waktu_clock_in ? new Date(selectedWorkerStatus.waktu_clock_in).toLocaleTimeString('id-ID') : 'Belum'}</p>
+                                            <p>Clock-Out: {selectedWorkerStatus.waktu_clock_out ? new Date(selectedWorkerStatus.waktu_clock_out).toLocaleTimeString('id-ID') : 'Belum'}</p>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="mt-6 flex flex-col gap-2">
-                                    <button onClick={confirmFaceAttendance} disabled={isProcessing} className="bg-green-600 text-white font-bold py-3 rounded-lg text-lg hover:bg-green-700 disabled:opacity-50">
-                                        {isProcessing ? 'Memproses...' : 'Konfirmasi Clock-In'}
+                                    <button onClick={confirmFaceAttendance} disabled={isProcessing} className={`text-white font-bold py-3 rounded-lg text-lg disabled:opacity-50 ${detectedAction === 'clock_in' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
+                                        {isProcessing ? 'Memproses...' : `Konfirmasi ${detectedAction === 'clock_in' ? 'Clock-In' : 'Clock-Out'}`}
                                     </button>
                                     <button onClick={() => setCapturedImage(null)} disabled={isProcessing} className="bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 disabled:opacity-50">
                                         Ambil Ulang
@@ -187,14 +338,25 @@ const AttendanceModal = ({ isOpen, onClose, onComplete, mode, worker, actionType
                  return (
                     <div>
                         <h2 className="text-2xl font-bold mb-4 text-center">Pindai QR Code Pekerja</h2>
-                        <div className="w-full h-72 mx-auto border-4 rounded-lg overflow-hidden bg-gray-900 mb-6">
-                           <QrReader
+                        <p className="text-center text-gray-600 mb-4">Sistem akan otomatis mendeteksi apakah untuk Clock In atau Clock Out</p>
+                        <div className="w-full h-80 mx-auto border-4 rounded-lg overflow-hidden bg-gray-900 mb-6 relative">
+                           <CustomQrReader
                                 onResult={handleQrScan}
-                                constraints={{ facingMode: 'environment' }}
                                 style={{ width: '100%', height: '100%' }}
                            />
                         </div>
-                        <p className="text-center text-gray-600">Arahkan kamera ke QR Code milik pekerja untuk {actionType === 'clock_in' ? 'Clock In' : 'Clock Out'}.</p>
+                        <div className="text-center">
+                            <p className="text-gray-600 mb-2">Arahkan kamera ke QR Code milik pekerja</p>
+                            <p className="text-sm text-blue-600">
+                                📱 Pastikan QR Code berada dalam kotak merah di tengah
+                            </p>
+                            {isProcessing && (
+                                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                    <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                                    <p className="text-blue-700">Memproses absensi...</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 );
             case 'manual':
@@ -344,14 +506,11 @@ const HalamanAbsensi = () => {
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <h1 className="text-3xl font-bold text-gray-800">Manajemen Absensi Harian</h1>
                 <div className="flex gap-2 sm:gap-4 w-full md:w-auto">
-                    <button onClick={() => openModal('face', null, 'clock_in')} className="flex-1 bg-teal-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-teal-700 transition-colors">
-                        Sesi Wajah
+                    <button onClick={() => openModal('face', null, 'smart')} className="flex-1 bg-teal-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-teal-700 transition-colors">
+                        Absensi Wajah
                     </button>
-                    <button onClick={() => openModal('qr', null, 'clock_in')} className="flex-1 bg-sky-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-sky-700 transition-colors">
-                        Pindai QR Masuk
-                    </button>
-                     <button onClick={() => openModal('qr', null, 'clock_out')} className="flex-1 bg-rose-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-rose-700 transition-colors">
-                        Pindai QR Pulang
+                    <button onClick={() => openModal('qr', null, 'smart')} className="flex-1 bg-sky-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-sky-700 transition-colors">
+                        Pindai QR Code
                     </button>
                 </div>
             </div>
