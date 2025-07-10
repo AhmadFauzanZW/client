@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 const PekerjaFormModal = ({ isOpen, onClose, onSubmit, initialData, metaData }) => {
     const [formData, setFormData] = useState({
-        nama_pengguna: '', email: '', password: '',
+        nama_pengguna: '', no_telpon: '', alamat: '', email: '', password: '',
         id_jenis_pekerjaan: '', id_lokasi_penugasan: '', gaji_harian: ''
     });
 
@@ -13,7 +13,7 @@ const PekerjaFormModal = ({ isOpen, onClose, onSubmit, initialData, metaData }) 
             setFormData({ ...initialData, password: '' }); // Kosongkan password saat edit
         } else {
             setFormData({
-                nama_pengguna: '', email: '', password: '',
+                nama_pengguna: '', no_telpon: '', alamat: '', email: '', password: '',
                 id_jenis_pekerjaan: '', id_lokasi_penugasan: '', gaji_harian: ''
             });
         }
@@ -36,6 +36,8 @@ const PekerjaFormModal = ({ isOpen, onClose, onSubmit, initialData, metaData }) 
                 <h2 className="text-2xl font-bold mb-6">{initialData ? 'Edit Data Pekerja' : 'Tambah Pekerja Baru'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input type="text" name="nama_pengguna" value={formData.nama_pengguna} onChange={handleChange} placeholder="Nama Lengkap" required className="w-full p-2 border rounded" />
+                    <input type="text" maxLength='15' name="no_telpon" value={formData.no_telpon} onChange={handleChange} placeholder="No Telpon" required className="w-full p-2 border rounded" />
+                    <input type="text" name="alamat" value={formData.alamat} onChange={handleChange} placeholder="Alamat" required className="w-full p-2 border rounded" />
                     <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" required className="w-full p-2 border rounded" />
                     <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder={initialData ? 'Kosongkan jika tidak ganti password' : 'Password'} required={!initialData} className="w-full p-2 border rounded" />
                     <select name="id_jenis_pekerjaan" value={formData.id_jenis_pekerjaan} onChange={handleChange} required className="w-full p-2 border rounded">
