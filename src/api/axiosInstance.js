@@ -33,7 +33,7 @@ axiosInstance.interceptors.response.use(
     },
     (error) => {
         // Cek jika error adalah karena token tidak valid (401)
-        if (error.response?.status === 401 && originalRequest.url !== '/api/auth/login') {
+        if (error.response?.status === 401 && error.config?.url !== '/api/auth/login') {
             // Hapus data yang tidak valid
             localStorage.removeItem('token');
             localStorage.removeItem('user');

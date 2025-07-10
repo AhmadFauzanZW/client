@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>API Test</h1>
+    <button onclick="testStatusHarian()">Test /kehadiran/status-harian</button>
+    <button onclick="testMingguan()">Test /kehadiran/mingguan</button>
+    <div id="results"></div>
+
+    <script>
+        const host = window.location.hostname;
+        const API_BASE_URL = `http://${host}:5000/api`;
+        
+        async function testStatusHarian() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing /kehadiran/status-harian...</p>';
+            
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${API_BASE_URL}/kehadiran/status-harian`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                results.innerHTML = `
+                    <h3>Status Harian API Test Results:</h3>
+                    <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                    <p><strong>Data length:</strong> ${Array.isArray(data) ? data.length : 'Not an array'}</p>
+                    <pre style="background: #f5f5f5; padding: 10px; overflow: auto; max-height: 300px;">${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                results.innerHTML = `
+                    <h3>Status Harian API Test - ERROR:</h3>
+                    <p style="color: red;"><strong>Error:</strong> ${error.message}</p>
+                    <p><strong>Check console for more details</strong></p>
+                `;
+            }
+        }
+        
+        async function testMingguan() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing /kehadiran/mingguan...</p>';
+            
+            try {
+                const token = localStorage.getItem('token');
+                const today = new Date().toISOString().slice(0, 10);
+                const response = await fetch(`${API_BASE_URL}/kehadiran/mingguan?tanggal=${today}`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                results.innerHTML = `
+                    <h3>Mingguan API Test Results:</h3>
+                    <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                    <p><strong>Data length:</strong> ${Array.isArray(data) ? data.length : 'Not an array'}</p>
+                    <pre style="background: #f5f5f5; padding: 10px; overflow: auto; max-height: 300px;">${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                results.innerHTML = `
+                    <h3>Mingguan API Test - ERROR:</h3>
+                    <p style="color: red;"><strong>Error:</strong> ${error.message}</p>
+                `;
+            }
+        }
+        
+        // Show current localStorage
+        console.log('Current token:', localStorage.getItem('token'));
+        console.log('Current user:', localStorage.getItem('user'));
+    </script>
+</body>
+</html>

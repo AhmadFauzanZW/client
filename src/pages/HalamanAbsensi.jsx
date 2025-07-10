@@ -250,21 +250,31 @@ const HalamanAbsensi = () => {
     const fetchAbsensiMingguan = useCallback(async (tanggal) => {
         setReportLoading(true);
         try {
-          const { data } = await axiosInstance.get('/kehadiran/mingguan', { params: { tanggal } });
-          setAbsensiMingguan(data);
+            console.log('Fetching weekly attendance for date:', tanggal);
+            const { data } = await axiosInstance.get('/kehadiran/mingguan', { params: { tanggal } });
+            console.log('Weekly attendance response:', data);
+            setAbsensiMingguan(data);
         } catch (error) {
-          console.error("Gagal mengambil data absensi mingguan:", error);
+            console.error("Gagal mengambil data absensi mingguan:", error);
+            console.error("Error response:", error.response?.data);
+            setAbsensiMingguan([]);
         } finally {
-          setReportLoading(false);
+            setReportLoading(false);
         }
     }, []);
 
     const fetchWorkerStatus = useCallback(async () => {
         try {
+            console.log('Fetching worker status from:', '/kehadiran/status-harian');
             const { data } = await axiosInstance.get('/kehadiran/status-harian');
+            console.log('Worker status response:', data);
             setWorkerStatusList(data);
         } catch (error) {
             console.error("Gagal mengambil status pekerja:", error);
+            console.error("Error response:", error.response?.data);
+            console.error("Error status:", error.response?.status);
+            // Set empty array to show "no workers" message instead of loading forever
+            setWorkerStatusList([]);
         }
     }, []);
 
@@ -298,6 +308,9 @@ const HalamanAbsensi = () => {
         const result = workerStatusList.filter(w =>
             w.nama_pengguna.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        console.log('Worker status list:', workerStatusList);
+        console.log('Search term:', searchTerm);
+        console.log('Filtered result:', result);
         setFilteredList(result);
     }, [searchTerm, workerStatusList]);
 
@@ -368,17 +381,19 @@ const HalamanAbsensi = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {isLoading && workerStatusList.length === 0 ? (
+                            {isLoading ? (
                                 <tr><td colSpan="5" className="p-4 text-center text-gray-500">Memuat data pekerja...</td></tr>
+                            ) : workerStatusList.length === 0 ? (
+                                <tr><td colSpan="5" className="p-4 text-center text-gray-500">Tidak ada data pekerja yang ditemukan dari server.</td></tr>
                             ) : filteredList.length === 0 ? (
-                                <tr><td colSpan="5" className="p-4 text-center text-gray-500">Tidak ada pekerja yang cocok atau terdaftar untuk lokasi Anda.</td></tr>
+                                <tr><td colSpan="5" className="p-4 text-center text-gray-500">Tidak ada pekerja yang cocok dengan pencarian "{searchTerm}".</td></tr>
                             ) : (
                                 filteredList.map(worker => {
                                     const clockedIn = !!worker.waktu_clock_in;
                                     const clockedOut = !!worker.waktu_clock_out;
                                     
                                     let statusText = "Belum Hadir";
-                                    if (clockedIn && !clockedOut) statusText = `Hadir (${worker.status_kehadiran})`;
+                                    if (clockedIn && !clockedOut) statusText = `${worker.status_kehadiran}`;
                                     if (clockedOut) statusText = `Pulang (${worker.status_kehadiran})`;
 
                                     return (
