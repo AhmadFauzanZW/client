@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+@theme {
+    --font-poppins: "Poppins", sans-serif;
+}
+
+/* Custom styles untuk react-calendar */
+.react-calendar {
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    padding: 1rem;
+}
+
+/* Warna untuk status kehadiran */
+.react-calendar__tile.hadir { background-color: #dcfce7; } /* green-100 */
+.react-calendar__tile.telat { background-color: #fef9c3; } /* yellow-100 */
+.react-calendar__tile.izin { background-color: #cffafe; } /* cyan-100 */
+.react-calendar__tile.lembur { background-color: #e0e7ff; } /* indigo-100 */
+.react-calendar__tile.pulang-cepat { background-color: #ffedd5; } /* orange-100 */
+.react-calendar__tile.absen { background-color: #fee2e2; } /* red-100 */
+
+.react-calendar__tile:hover {
+    background-color: #e5e7eb; /* gray-200 */
+}
+
+@media (max-width: 768px) {
+    .responsive-table thead {
+        display: none;
+    }
+    .responsive-table tr {
+        display: block;
+        margin-bottom: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e5e7eb;
+    }
+    .responsive-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        text-align: right;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .responsive-table td:last-child {
+        border-bottom: none;
+    }
+    .responsive-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        text-align: left;
+        margin-right: 1rem;
+    }
+}
