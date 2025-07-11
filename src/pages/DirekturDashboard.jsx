@@ -16,6 +16,7 @@ const DirekturDashboard = () => {
     const [logs, setLogs] = useState([]);
     const [izinUntukValidasi, setIzinUntukValidasi] = useState([]);
     const [periode, setPeriode] = useState(new Date());
+    const [logPagination, setLogPagination] = useState({ page: 1, totalPages: 1 });
 
     // Fetch dashboard data
     useEffect(() => {
@@ -37,39 +38,40 @@ const DirekturDashboard = () => {
     }, [periode]);
 
     // Fetch logs
+    const fetchLogData = async (halaman = 1) => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axiosInstance.get('/logs', {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { page: halaman, limit: 7 }
+            });
+            setLogs(response.data.logs || []);
+            setLogPagination(response.data.pagination); // Simpan data paginasi dari backend
+        } catch (error) {
+            console.error("Gagal mengambil log aktivitas:", error);
+            console.error("Error response:", error.response?.data);
+            setLogs([]);
+        }
+    };
+
     useEffect(() => {
-        const fetchLogData = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                // Kita juga akan langsung implementasi paginasi di sini
-                const response = await axiosInstance.get('/logs', {
-                    headers: { Authorization: `Bearer ${token}` },
-                    params: { page: 1, limit: 7 } // Ambil 7 log terbaru untuk tampilan awal
-                });
-                // Ambil hanya array 'logs' dari dalam objek response
-                setLogs(response.data.logs);
-                // Simpan juga data paginasinya jika perlu
-                // setLogPagination(response.data.pagination);
-            } catch (error) {
-                console.error("Gagal mengambil log aktivitas:", error);
-            }
-        };
-        fetchLogData();
+        fetchLogData(1); // Fetch halaman pertama
     }, []);
 
     // Fetch izin untuk validasi
+    const fetchIzinData = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axiosInstance.get('/izin/validasi', {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setIzinUntukValidasi(response.data);
+        } catch (error) {
+            console.error("Gagal mengambil data validasi izin:", error);
+        }
+    };
+
     useEffect(() => {
-        const fetchIzinData = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await axiosInstance.get('/izin/validasi', {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                setIzinUntukValidasi(response.data);
-            } catch (error) {
-                console.error("Gagal mengambil data validasi izin:", error);
-            }
-        };
         fetchIzinData();
     }, []);
 
@@ -184,11 +186,10 @@ const DirekturDashboard = () => {
                 </div>
 
                 <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h2 className="text-xl font-semibold mb-4">Log Aktivitas & Persetujuan Izin</h2>
+                    <h2 className="text-xl font-semibold mb-4">Log Aktivitas</h2>
 
                     {/* Log Aktivitas */}
                     <div className="mb-6">
-                        <h3 className="font-medium mb-2">Log Aktivitas Pengguna</h3>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead className="border-b-2 border-gray-200">
@@ -200,34 +201,64 @@ const DirekturDashboard = () => {
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {logs.length > 0 ? (
-                                    logs.map((log, i) => (
-                                        <tr key={i} className="border-b">
-                                            <td className="py-2 pr-4 whitespace-nowrap">
-                                                {new Date(log.waktu_aktivitas).toLocaleString('id-ID')}
-                                            </td>
-                                            <td className="py-2 pr-4">
-                                                {log.nama_pengguna || log.user} ({log.nama_peran || log.role})
-                                            </td>
-                                            <td className="py-2 pr-4">
-                                                    <span className="bg-gray-200 px-2 py-1 rounded-full text-xs">
-                                                        {log.tipe_aktivitas || log.action}
+                                    {logs.length > 0 ? (
+                                        logs.map((log, i) => (
+                                            <tr key={i} className="border-b">
+                                                <td className="py-2 pr-4 whitespace-nowrap">
+                                                    {/* Ganti log.waktu_aktivitas menjadi log.waktu */}
+                                                    {new Date(log.waktu).toLocaleString('id-ID', {
+                                                        year: 'numeric', month: 'long', day: 'numeric',
+                                                        hour: '2-digit', minute: '2-digit', second: '2-digit'
+                                                    })}
+                                                </td>
+                                                <td className="py-2 pr-4">
+                                                    {/* Ganti log.nama_pengguna menjadi log.nama_lengkap dan gunakan log.role */}
+                                                    {log.nama_lengkap} ({log.role})
+                                                </td>
+                                                <td className="py-2 pr-4">
+                                                    {/* Ganti log.tipe_aktivitas menjadi log.aktivitas */}
+                                                    <span className="bg-gray-200 px-2 py-1 rounded-full text-xs capitalize">
+                                                        {log.aktivitas}
                                                     </span>
+                                                </td>
+                                                <td className="py-2">{log.deskripsi}</td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="4" className="text-center py-4 text-gray-500">
+                                                Tidak ada log aktivitas.
                                             </td>
-                                            <td className="py-2">{log.deskripsi || log.description}</td>
                                         </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan="4" className="text-center py-4 text-gray-500">
-                                            Tidak ada log aktivitas.
-                                        </td>
-                                    </tr>
-                                )}
+                                    )}
                                 </tbody>
                             </table>
                         </div>
                     </div>
+
+                    {logs.length > 0 && (
+                      <div className="flex justify-between items-center mt-4">
+                          <span className="text-sm text-gray-600">
+                              Halaman {logPagination.page} dari {logPagination.totalPages}
+                          </span>
+                          <div className="flex space-x-2">
+                              <button
+                                  onClick={() => fetchLogData(logPagination.page - 1)}
+                                  disabled={logPagination.page <= 1}
+                                  className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                  Sebelumnya
+                              </button>
+                              <button
+                                  onClick={() => fetchLogData(logPagination.page + 1)}
+                                  disabled={logPagination.page >= logPagination.totalPages}
+                                  className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                  Berikutnya
+                              </button>
+                          </div>
+                      </div>
+                    )}
                 </div>
             </div>
         </Layout>

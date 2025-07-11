@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import axiosInstance from '../api/axiosInstance';
 import PekerjaFormModal from '../components/PekerjaFormModal';
+import FaceRegistrationModal from '../components/FaceRegistrationModal';
+import QrGenerationModal from '../components/QrGenerationModal';
 
 const useDebounce = (value, delay) => {
     const [debouncedValue, setDebouncedValue] = useState(value);
@@ -25,6 +27,10 @@ const KelolaPekerja = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedWorker, setSelectedWorker] = useState(null);
+    const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
+    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+    const [selectedWorkerForFace, setSelectedWorkerForFace] = useState(null);
+    const [selectedWorkerForQr, setSelectedWorkerForQr] = useState(null);
 
     const [queryParams, setQueryParams] = useState({
         search: '',
@@ -118,6 +124,72 @@ const KelolaPekerja = () => {
         }
     };
 
+    // Handle Face Registration Modal
+    const handleOpenFaceModal = (worker) => {
+        setSelectedWorkerForFace(worker);
+        setIsFaceModalOpen(true);
+    };
+
+    const handleCloseFaceModal = () => {
+        setIsFaceModalOpen(false);
+        setSelectedWorkerForFace(null);
+    };
+
+    // Handle QR Generation Modal
+    const handleOpenQrModal = (worker) => {
+        setSelectedWorkerForQr(worker);
+        setIsQrModalOpen(true);
+    };
+
+    const handleCloseQrModal = () => {
+        setIsQrModalOpen(false);
+        setSelectedWorkerForQr(null);
+    };
+
+    // Generate QR Code for worker
+    const handleGenerateQR = async (workerId, qrCodeValue) => {
+        const token = localStorage.getItem('token');
+        try {
+            const response = await axiosInstance.post(`/manajemen/pekerja/${workerId}/generate-qr`, {
+                qr_code: qrCodeValue
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            if (response.data.success) {
+                alert('QR Code berhasil disimpan!');
+                fetchData(); // Refresh data
+                handleCloseQrModal();
+            }
+        } catch (error) {
+            console.error("Gagal simpan QR:", error);
+            alert(error.response?.data?.message || 'Gagal menyimpan QR Code');
+        }
+    };
+
+    // Handle Face Registration
+    const handleFaceRegistration = async (faceData) => {
+        const token = localStorage.getItem('token');
+        try {
+            const response = await axiosInstance.post(`/face-recognition/register`, {
+                id_pekerja: selectedWorkerForFace.id_pekerja,
+                nama_pengguna: selectedWorkerForFace.nama_pengguna,
+                face_image: faceData.faceImage // Base64 image
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            if (response.data.success) {
+                alert('Wajah berhasil didaftarkan!');
+                fetchData(); // Refresh data
+                handleCloseFaceModal();
+            }
+        } catch (error) {
+            console.error("Gagal daftar wajah:", error);
+            alert(error.response?.data?.message || 'Gagal mendaftarkan wajah');
+        }
+    };
+
     return (
         <Layout>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -157,13 +229,15 @@ const KelolaPekerja = () => {
                                 <th className="p-3">Jabatan</th>
                                 <th className="p-3 hidden sm:table-cell">Lokasi</th>
                                 <th className="p-3 cursor-pointer" onClick={() => handleSort('waktu_dibuat')}>Tgl Dibuat {queryParams.sortBy === 'waktu_dibuat' && (queryParams.sortOrder === 'ASC' ? '▲' : '▼')}</th>
-                                <th className="p-3">Status</th>
+                                <th className="p-3 text-center">Status</th>
+                                <th className="p-3 text-center hidden lg:table-cell">Wajah</th>
+                                <th className="p-3 text-center hidden lg:table-cell">QR Code</th>
                                 <th className="p-3 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                         {loading ? (
-                            <tr><td colSpan="7" className="text-center p-4">Memuat data...</td></tr>
+                            <tr><td colSpan="9" className="text-center p-4">Memuat data...</td></tr>
                         ) : workers.map(w => (
                             <tr key={w.id_pekerja} className="border-b">
                                 <td className="p-3 font-medium">{w.nama_pengguna}</td>
@@ -171,10 +245,39 @@ const KelolaPekerja = () => {
                                 <td className="p-3">{w.nama_pekerjaan}</td>
                                 <td className="p-3 text-gray-600 hidden sm:table-cell">{w.nama_lokasi}</td>
                                 <td className="p-3 text-gray-600">{new Date(w.waktu_dibuat).toLocaleDateString('id-ID')}</td>
-                                <td className="p-3">
+                                <td className="p-3 text-center">
                                     <span className={`px-2 py-1 text-xs rounded-full ${w.status_pengguna === 'Aktif' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{w.status_pengguna}</span>
                                 </td>
-                                <td className="p-3 text-center flex justify-center gap-2">
+                                <td className="p-3 text-center hidden lg:table-cell">
+                                    <div className="flex flex-col items-center gap-1">
+                                        <span className={`px-2 py-1 text-xs rounded-full ${w.face_registered ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
+                                            {w.face_registered ? '✓ Terdaftar' : '⚠ Belum'}
+                                        </span>
+                                        <button
+                                            onClick={() => handleOpenFaceModal(w)}
+                                            className="bg-purple-500 text-white text-xs px-2 py-1 rounded hover:bg-purple-600 transition-colors"
+                                            title={w.face_registered ? 'Update Wajah' : 'Daftar Wajah'}
+                                        >
+                                            {w.face_registered ? '🔄 Update' : '📷 Daftar'}
+                                        </button>
+                                    </div>
+                                </td>
+                                <td className="p-3 text-center hidden lg:table-cell">
+                                    <div className="flex flex-col items-center gap-1">
+                                        <span className={`px-2 py-1 text-xs rounded-full ${w.kode_qr ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
+                                            {w.kode_qr ? '✓ Ada' : '⚠ Belum'}
+                                        </span>
+                                        <button
+                                            onClick={() => handleOpenQrModal(w)}
+                                            className="bg-indigo-500 text-white text-xs px-2 py-1 rounded hover:bg-indigo-600 transition-colors"
+                                            title={w.kode_qr ? 'Generate Ulang QR' : 'Generate QR'}
+                                        >
+                                            {w.kode_qr ? '🔄 Generate' : '📱 Buat QR'}
+                                        </button>
+                                    </div>
+                                </td>
+                                <td className="p-3 text-center">
+                                    <div className="flex flex-col sm:flex-row justify-center gap-1">
                                     <button
                                         onClick={() => handleOpenModal(w)}
                                         className="bg-blue-500 text-white text-sm px-3 py-1 rounded cursor-pointer hover:bg-blue-600 transition-colors"
@@ -189,8 +292,9 @@ const KelolaPekerja = () => {
                                                 : 'bg-green-500 text-white hover:bg-green-600'
                                         }`}
                                     >
-                                        {w.status_pengguna === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan'}
-                                    </button>
+                                        {w.status_pengguna === 'Aktif' ? 'Nonaktif' : 'Aktif'}
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -217,6 +321,20 @@ const KelolaPekerja = () => {
                 onSubmit={handleSubmit}
                 initialData={selectedWorker}
                 metaData={metaData}
+            />
+
+            <FaceRegistrationModal
+                isOpen={isFaceModalOpen}
+                onClose={handleCloseFaceModal}
+                onSubmit={handleFaceRegistration}
+                worker={selectedWorkerForFace}
+            />
+
+            <QrGenerationModal
+                isOpen={isQrModalOpen}
+                onClose={handleCloseQrModal}
+                onGenerate={handleGenerateQR}
+                worker={selectedWorkerForQr}
             />
         </Layout>
     );

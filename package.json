@@ -20,6 +20,7 @@
     "face-api.js": "^0.20.0",
     "file-saver": "^2.0.5",
     "postcss": "^8.5.6",
+    "qrcode": "^1.5.4",
     "react": "^19.1.0",
     "react-calendar": "^6.0.0",
     "react-chartjs-2": "^5.3.0",
