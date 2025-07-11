@@ -251,7 +251,7 @@ const KelolaPekerja = () => {
                                 <td className="p-3 text-center hidden lg:table-cell">
                                     <div className="flex flex-col items-center gap-1">
                                         <span className={`px-2 py-1 text-xs rounded-full ${w.face_registered ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
-                                            {w.face_registered ? '✓ Terdaftar' : '⚠ Belum'}
+                                            {w.face_registered ? '✓ Ada' : '⚠ Belum'}
                                         </span>
                                         <button
                                             onClick={() => handleOpenFaceModal(w)}
